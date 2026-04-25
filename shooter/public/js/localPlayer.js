@@ -10,9 +10,12 @@ export class LocalPlayer {
     this.color = character.color;
     this.fireCooldown = 0;
     this.abilityCooldown = 0;
-    // status flagy (využívají schopnosti)
     this.shieldUntil = 0;
     this.invisibleUntil = 0;
+    this.name = '';
+    // poslední pohybový směr (pro dash, atd.)
+    this.moveDirX = 0;
+    this.moveDirY = 0;
   }
 
   update(dt, input, mouse, worldW, worldH) {
@@ -24,10 +27,13 @@ export class LocalPlayer {
     const len = Math.hypot(dx, dy);
     if (len > 0) { dx /= len; dy /= len; }
 
+    // ulož směr pro abilities (dash atd.)
+    this.moveDirX = dx;
+    this.moveDirY = dy;
+
     this.x += dx * this.speed * dt;
     this.y += dy * this.speed * dt;
 
-    // clamp do světa
     this.x = Math.max(18, Math.min(worldW - 18, this.x));
     this.y = Math.max(18, Math.min(worldH - 18, this.y));
 
