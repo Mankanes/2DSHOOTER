@@ -4,6 +4,7 @@ import { WEAPONS, LOADOUTS } from './weapons.js';
 import { LocalPlayer } from './localPlayer.js';
 import { RemotePlayer } from './remotePlayer.js';
 import { Bullet } from './bullet.js';
+import { circleRectCollide, pointInRect } from './maps.js';
 
 // ── Default keybinds ────────────────────────────
 const DEFAULT_KEYBINDS = {
@@ -81,6 +82,7 @@ export function initGame({ session, showScreen }) {
   let me = null;
   let remotes = {};
   let bullets = [];
+  let walls = []; // { x, y, w, h, type, hp, destroyed }
   let loadout = null;
   let activeSlot = 'primary';
   let stateInterval = null;
@@ -437,6 +439,17 @@ export function initGame({ session, showScreen }) {
     }
   });
 
+  socket.on('game:wallHp', (d) => {
+    if (walls[d.idx]) walls[d.idx].hp = d.hp;
+  });
+
+  socket.on('game:wallDestroyed', (d) => {
+    if (walls[d.idx]) {
+      walls[d.idx].destroyed = true;
+      walls[d.idx].hp = 0;
+    }
+  });
+
   // ── Start hry ────────────────────────────────
   function startGame(data) {
     session.selfId = socket.id;
@@ -458,6 +471,7 @@ export function initGame({ session, showScreen }) {
       world.w = data.world.w;
       world.h = data.world.h;
     }
+    walls = (data.walls || []).map(w => ({ ...w, destroyed: false }));
     camera.x = 0;
     camera.y = 0;
 
@@ -631,12 +645,19 @@ export function initGame({ session, showScreen }) {
     if (me) {
       if (!pauseOpen) {
         me.update(dt, readMovement(), mouse, world.w, world.h);
+        me.applyMove(walls, world.w, world.h);
         tryShoot();
       }
 
       for (const id in remotes) remotes[id].update();
 
-      for (const b of bullets) b.update(dt, world.w, world.h);
+      for (const b of bullets) {
+        const hit = b.update(dt, world.w, world.h, walls);
+        // pokud moje kulka trefila dřevo, nahlas serveru
+        if (hit && hit.type === 'wood' && b.ownerId === session.selfId) {
+          socket.emit('game:wallHit', { idx: hit.hitWallIdx, damage: b.damage });
+        }
+      }
       checkBulletHits();
       for (let i = bullets.length - 1; i >= 0; i--) {
         if (bullets[i].dead) bullets.splice(i, 1);
@@ -702,6 +723,74 @@ export function initGame({ session, showScreen }) {
     ctx.strokeStyle = '#ff6b6b';
     ctx.lineWidth = 3;
     ctx.strokeRect(0, 0, world.w, world.h);
+
+    drawWalls();
+  }
+
+  function drawWalls() {
+    for (const w of walls) {
+      if (w.destroyed) continue;
+
+      if (w.type === 'stone') {
+        // kámen — šedý s tmavším okrajem
+        ctx.fillStyle = '#6b7280';
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeStyle = '#374151';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+        // texturní detail — pixel pattern
+        ctx.fillStyle = '#9ca3af';
+        for (let dy = 4; dy < w.h - 2; dy += 8) {
+          for (let dx = 4; dx < w.w - 2; dx += 8) {
+            ctx.fillRect(w.x + dx, w.y + dy, 2, 2);
+          }
+        }
+      } else if (w.type === 'wood') {
+        // dřevo — hnědé, barva podle HP
+        const hpPct = (w.hp || 0) / 80;
+        const r = Math.floor(139 - (1 - hpPct) * 30); // tmavne s damage
+        const g = Math.floor(90  - (1 - hpPct) * 30);
+        const b = Math.floor(43  - (1 - hpPct) * 20);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeStyle = '#3d2817';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+        // textura — vodorovné pruhy (dřevěné prkno)
+        ctx.strokeStyle = '#3d2817';
+        ctx.lineWidth = 1;
+        if (w.w > w.h) {
+          for (let dy = 6; dy < w.h; dy += 6) {
+            ctx.beginPath();
+            ctx.moveTo(w.x, w.y + dy);
+            ctx.lineTo(w.x + w.w, w.y + dy);
+            ctx.stroke();
+          }
+        } else {
+          for (let dx = 6; dx < w.w; dx += 6) {
+            ctx.beginPath();
+            ctx.moveTo(w.x + dx, w.y);
+            ctx.lineTo(w.x + dx, w.y + w.h);
+            ctx.stroke();
+          }
+        }
+        // HP indikátor — praskliny když je damage
+        if (hpPct < 0.7) {
+          ctx.strokeStyle = '#1a1006';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(w.x + w.w * 0.2, w.y);
+          ctx.lineTo(w.x + w.w * 0.4, w.y + w.h);
+          ctx.stroke();
+        }
+        if (hpPct < 0.4) {
+          ctx.beginPath();
+          ctx.moveTo(w.x + w.w * 0.7, w.y);
+          ctx.lineTo(w.x + w.w * 0.5, w.y + w.h);
+          ctx.stroke();
+        }
+      }
+    }
   }
 
   // ── Minimap ──────────────────────────────────
@@ -725,6 +814,18 @@ export function initGame({ session, showScreen }) {
     mctx.strokeStyle = '#4ecdc4';
     mctx.lineWidth = 1;
     mctx.strokeRect(ox, oy, w, h);
+
+    // zdi
+    for (const wall of walls) {
+      if (wall.destroyed) continue;
+      mctx.fillStyle = wall.type === 'stone' ? '#9ca3af' : '#8b6543';
+      mctx.fillRect(
+        ox + wall.x * scale,
+        oy + wall.y * scale,
+        Math.max(1, wall.w * scale),
+        Math.max(1, wall.h * scale),
+      );
+    }
 
     // viewport rectangle (kde se aktuálně dívám)
     const vx = ox + camera.x * scale;
