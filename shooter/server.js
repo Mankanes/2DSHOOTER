@@ -9,72 +9,57 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Map walls — must match public/js/maps.js
-const MAP_WALLS = {
-  small: [
-    { x: 380, y: 280, w: 60, h: 40, type: 'stone' },
-    { x: 480, y: 280, w: 60, h: 40, type: 'stone' },
-    { x: 200, y: 150, w: 20, h: 100, type: 'wood' },
-    { x: 740, y: 350, w: 20, h: 100, type: 'wood' },
-    { x: 100, y: 450, w: 120, h: 20, type: 'wood' },
-    { x: 740, y: 130, w: 120, h: 20, type: 'wood' },
-  ],
-  medium: [
-    { x: 250, y: 200, w: 80, h: 30, type: 'stone' },
-    { x: 1070, y: 200, w: 80, h: 30, type: 'stone' },
-    { x: 250, y: 670, w: 80, h: 30, type: 'stone' },
-    { x: 1070, y: 670, w: 80, h: 30, type: 'stone' },
-    { x: 660, y: 400, w: 80, h: 100, type: 'stone' },
-    { x: 580, y: 380, w: 240, h: 20, type: 'stone' },
-    { x: 580, y: 500, w: 240, h: 20, type: 'stone' },
-    { x: 500, y: 150, w: 20, h: 120, type: 'wood' },
-    { x: 880, y: 630, w: 20, h: 120, type: 'wood' },
-    { x: 150, y: 400, w: 100, h: 20, type: 'wood' },
-    { x: 1150, y: 480, w: 100, h: 20, type: 'wood' },
-  ],
-  large: [
-    { x: 200, y: 250, w: 150, h: 30, type: 'stone' },
-    { x: 2050, y: 250, w: 150, h: 30, type: 'stone' },
-    { x: 200, y: 1520, w: 150, h: 30, type: 'stone' },
-    { x: 2050, y: 1520, w: 150, h: 30, type: 'stone' },
-    { x: 1100, y: 800, w: 200, h: 30, type: 'stone' },
-    { x: 1100, y: 970, w: 200, h: 30, type: 'stone' },
-    { x: 1100, y: 800, w: 30, h: 200, type: 'stone' },
-    { x: 1270, y: 800, w: 30, h: 200, type: 'stone' },
-    { x: 600, y: 500, w: 30, h: 200, type: 'wood' },
-    { x: 800, y: 600, w: 200, h: 30, type: 'wood' },
-    { x: 1500, y: 500, w: 200, h: 30, type: 'wood' },
-    { x: 1700, y: 600, w: 30, h: 200, type: 'wood' },
-    { x: 600, y: 1100, w: 200, h: 30, type: 'wood' },
-    { x: 800, y: 1200, w: 30, h: 200, type: 'wood' },
-    { x: 1500, y: 1200, w: 30, h: 200, type: 'wood' },
-    { x: 1700, y: 1100, w: 200, h: 30, type: 'wood' },
-    { x: 400, y: 900, w: 30, h: 250, type: 'stone' },
-    { x: 1970, y: 700, w: 30, h: 250, type: 'stone' },
-  ],
-  huge: [
-    { x: 1500, y: 1500, w: 200, h: 30, type: 'stone' },
-    { x: 1500, y: 1670, w: 200, h: 30, type: 'stone' },
-    { x: 1500, y: 1500, w: 30, h: 200, type: 'stone' },
-    { x: 1670, y: 1500, w: 30, h: 200, type: 'stone' },
-    { x: 600, y: 600, w: 100, h: 100, type: 'stone' },
-    { x: 2500, y: 600, w: 100, h: 100, type: 'stone' },
-    { x: 600, y: 2500, w: 100, h: 100, type: 'stone' },
-    { x: 2500, y: 2500, w: 100, h: 100, type: 'stone' },
-    { x: 300, y: 1500, w: 30, h: 300, type: 'wood' },
-    { x: 2870, y: 1500, w: 30, h: 300, type: 'wood' },
-    { x: 1500, y: 300, w: 300, h: 30, type: 'wood' },
-    { x: 1500, y: 2870, w: 300, h: 30, type: 'wood' },
-    { x: 1000, y: 1000, w: 30, h: 400, type: 'wood' },
-    { x: 1000, y: 1000, w: 400, h: 30, type: 'wood' },
-    { x: 2200, y: 1800, w: 30, h: 400, type: 'wood' },
-    { x: 1800, y: 2200, w: 400, h: 30, type: 'wood' },
-    { x: 800, y: 1900, w: 200, h: 30, type: 'wood' },
-    { x: 2200, y: 1100, w: 200, h: 30, type: 'wood' },
-    { x: 1100, y: 600, w: 30, h: 150, type: 'stone' },
-    { x: 1900, y: 2400, w: 30, h: 150, type: 'stone' },
-  ],
-};
+// Random map generator — generates walls for a given world size.
+// Returns empty array for the smallest map (`small` world is 1 screen — no walls).
+function generateWalls(world, mapSize) {
+  if (mapSize === 'small') return []; // small mapa bez zdí
+
+  const walls = [];
+  const padding = 100; // odsazení od okraje
+  const area = world.w * world.h;
+
+  // Cílový počet zdí — škáluje s plochou
+  // medium ≈ 14, large ≈ 30, huge ≈ 70
+  const targetCount = Math.round(8 + area / 150000);
+
+  const SIZES = [
+    { w: 30, h: 100 }, { w: 30, h: 150 }, { w: 30, h: 200 },
+    { w: 100, h: 30 }, { w: 150, h: 30 }, { w: 200, h: 30 },
+    { w: 60, h: 60 }, { w: 80, h: 80 }, { w: 100, h: 100 },
+    { w: 200, h: 30 }, { w: 30, h: 200 },
+    { w: 150, h: 50 }, { w: 50, h: 150 },
+  ];
+
+  function overlaps(rect) {
+    const margin = 60; // minimální průchod mezi zdmi
+    for (const w of walls) {
+      if (rect.x < w.x + w.w + margin && rect.x + rect.w + margin > w.x &&
+          rect.y < w.y + w.h + margin && rect.y + rect.h + margin > w.y) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  let attempts = 0;
+  const maxAttempts = targetCount * 40;
+
+  while (walls.length < targetCount && attempts < maxAttempts) {
+    attempts++;
+    const size = SIZES[Math.floor(Math.random() * SIZES.length)];
+    const x = Math.round(padding + Math.random() * (world.w - 2 * padding - size.w));
+    const y = Math.round(padding + Math.random() * (world.h - 2 * padding - size.h));
+    const rect = { x, y, w: size.w, h: size.h };
+
+    if (overlaps(rect)) continue;
+
+    // ~40% kámen, ~60% dřevo
+    const type = Math.random() < 0.4 ? 'stone' : 'wood';
+    walls.push({ ...rect, type });
+  }
+
+  return walls;
+}
 
 const WORLD_SIZES = {
   small:  { w: 960,  h: 600,  label: 'Small (1 screen)' },
@@ -272,7 +257,7 @@ io.on('connection', (socket) => {
     }
     room.started = true;
     const world = WORLD_SIZES[room.mapSize] || WORLD_SIZES[DEFAULT_MAP];
-    const walls = (MAP_WALLS[room.mapSize] || []).map(w => ({ ...w, hp: w.type === 'wood' ? 80 : Infinity }));
+    const walls = generateWalls(world, room.mapSize).map(w => ({ ...w, hp: w.type === 'wood' ? 80 : Infinity }));
 
     // najdi nekolidující spawn pozici
     function spawnPos() {

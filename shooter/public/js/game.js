@@ -4,7 +4,6 @@ import { WEAPONS, LOADOUTS } from './weapons.js';
 import { LocalPlayer } from './localPlayer.js';
 import { RemotePlayer } from './remotePlayer.js';
 import { Bullet } from './bullet.js';
-import { circleRectCollide, pointInRect } from './maps.js';
 
 // ── Default keybinds ────────────────────────────
 const DEFAULT_KEYBINDS = {
