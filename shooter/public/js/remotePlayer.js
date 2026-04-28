@@ -12,6 +12,8 @@ export class RemotePlayer {
     this.shieldUntil = 0;
     this.invisibleUntil = 0;
     this.name = '';
+    this.characterType = initial.characterType || 'soldier';
+    this.weapon = initial.weapon || 'pistol';
     this.snapshots = [];
   }
 
@@ -41,7 +43,7 @@ export class RemotePlayer {
     const last = snaps[snaps.length - 1];
     const prev = snaps[snaps.length - 2];
 
-    // Pokud render time je za posledním snímkem, extrapoluj (max 100ms)
+    // If render time is past last snapshot, extrapolate (max 100ms)
     if (renderTime > last.t) {
       const ahead = Math.min(100, renderTime - last.t);
       const span = last.t - prev.t;
@@ -58,7 +60,7 @@ export class RemotePlayer {
       return;
     }
 
-    // Najdi dva snímky obklopující render time
+    // Find two snapshots surrounding render time
     let a = snaps[0], b = snaps[1];
     for (let i = 0; i < snaps.length - 1; i++) {
       if (snaps[i].t <= renderTime && snaps[i + 1].t >= renderTime) {

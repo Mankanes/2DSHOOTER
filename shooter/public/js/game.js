@@ -4,6 +4,7 @@ import { WEAPONS, LOADOUTS } from './weapons.js';
 import { LocalPlayer } from './localPlayer.js';
 import { RemotePlayer } from './remotePlayer.js';
 import { Bullet } from './bullet.js';
+import { drawCharacter } from './sprites.js';
 
 // ── Default keybinds ────────────────────────────
 const DEFAULT_KEYBINDS = {
@@ -412,6 +413,10 @@ export function initGame({ session, showScreen }) {
   socket.on('game:shoot', (d) => {
     const w = WEAPONS[d.weapon];
     if (!w) return;
+    // aktualizuj aktuální zbraň remote hráče (pro vykreslení v ruce)
+    const r = remotes[d.ownerId];
+    if (r) r.weapon = d.weapon;
+
     for (let i = 0; i < w.pellets; i++) {
       const a = d.angle + (Math.random() - 0.5) * w.spread;
       bullets.push(new Bullet({
@@ -476,14 +481,18 @@ export function initGame({ session, showScreen }) {
 
     for (const p of data.players) {
       const character = CHARACTERS[p.character] || CHARACTERS.soldier;
+      const charLoadout = LOADOUTS[character.loadout] || LOADOUTS.soldier;
       if (p.id === session.selfId) {
         me = new LocalPlayer(p.x, p.y, character);
         me.name = p.name;
-        loadout = LOADOUTS[character.loadout] || LOADOUTS.soldier;
+        me.characterType = p.character;
+        loadout = charLoadout;
       } else {
         const r = new RemotePlayer({
           id: p.id, x: p.x, y: p.y, hp: p.hp,
           maxHp: character.maxHp, color: character.color,
+          characterType: p.character,
+          weapon: charLoadout.primary, // default
         });
         r.name = p.name;
         remotes[p.id] = r;
@@ -574,51 +583,61 @@ export function initGame({ session, showScreen }) {
     const inv = p.invisibleUntil && Date.now() < p.invisibleUntil;
     const sh  = p.shieldUntil    && Date.now() < p.shieldUntil;
 
-    // Pro ostatní je neviditelný hráč úplně skrytý — žádný kruh, jméno, HP bar
+    // Pro ostatní je neviditelný hráč úplně skrytý
     if (inv && !isSelf) return;
 
-    ctx.save();
-    // Sám sebe vidím poloprůhledně, ostatní mě vidí normálně (nebo vůbec)
-    ctx.globalAlpha = inv ? 0.35 : 1;
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.angle || 0);
-    ctx.fillStyle = isSelf ? '#4ecdc4' : (p.color || '#ff6b6b');
-    ctx.beginPath();
-    ctx.arc(0, 0, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(26, 0);
-    ctx.stroke();
-    ctx.restore();
+    // Postava + zbraň
+    const characterType = isSelf ? me.characterType : (p.characterType || 'soldier');
+    const weapon = isSelf ? (loadout?.[activeSlot] || 'pistol') : (p.weapon || 'pistol');
+    const alpha = inv ? 0.35 : 1;
 
+    drawCharacter(ctx, characterType, weapon, p.x, p.y, p.angle || 0, { alpha });
+
+    // Shield prsten
     if (sh) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = '#7fd0ff';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(p.x, p.y, 26, 0, Math.PI * 2);
       ctx.stroke();
-    }
-
-    if (p.name) {
-      ctx.save();
-      ctx.globalAlpha = inv ? 0.35 : 1;
-      ctx.fillStyle = '#fff';
-      ctx.font = '12px "Silkscreen", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(p.name, p.x, p.y - 36);
+      // mírně vnitřní glow
+      ctx.strokeStyle = 'rgba(127, 208, 255, 0.4)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 26, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
 
+    // Jméno
+    if (p.name) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      // pozadí pro lepší čitelnost
+      ctx.font = '12px "Silkscreen", monospace';
+      ctx.textAlign = 'center';
+      const w = ctx.measureText(p.name).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(p.x - w / 2 - 3, p.y - 44, w + 6, 14);
+      ctx.fillStyle = isSelf ? '#4ecdc4' : '#fff';
+      ctx.fillText(p.name, p.x, p.y - 33);
+      ctx.restore();
+    }
+
+    // HP bar
     const pct = Math.max(0, (p.hp || 0) / (p.maxHp || 100));
     ctx.save();
-    ctx.globalAlpha = inv ? 0.35 : 1;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(p.x - 22, p.y - 30, 44, 6);
-    ctx.fillStyle = '#5ec85e';
-    ctx.fillRect(p.x - 22, p.y - 30, 44 * pct, 6);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(p.x - 22, p.y + 24, 44, 6);
+    // barva HP — od zelené přes žlutou po červenou
+    let hpColor = '#5ec85e';
+    if (pct < 0.5) hpColor = '#ffe066';
+    if (pct < 0.25) hpColor = '#ff6b6b';
+    ctx.fillStyle = hpColor;
+    ctx.fillRect(p.x - 21, p.y + 25, 42 * pct, 4);
     ctx.restore();
   }
 
