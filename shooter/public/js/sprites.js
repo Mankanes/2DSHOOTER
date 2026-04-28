@@ -1,13 +1,12 @@
 // SPRITES — načítá Kenney top-down shooter PNG sprity
 //
-// Kenney sprite: hlava postavy v _stand obrázku míří NAHORU.
-// V našem souřadném systému úhel 0 = doprava.
-// Aby hlava směřovala ke kursoru: rotujeme o +PI/2.
+// Po debug testu: sprite má v nativním stavu hlavu vpravo,
+// takže žádný offset není potřeba.
 
-const SPRITE_ROTATION_OFFSET = Math.PI / 2;
+const SPRITE_ROTATION_OFFSET = 0;
 
 // DEBUG: nastav na true pokud ti rotace nesedí, uvidíš barevné značky
-const DEBUG_ROTATION = true;
+const DEBUG_ROTATION = false;
 
 // Cesty k souborům — null znamená "tenhle nemám, kresli kruh / nepoužívej"
 const CHARACTER_FILES = {
