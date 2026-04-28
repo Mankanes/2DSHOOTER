@@ -6,7 +6,7 @@
 
 const SPRITE_ROTATION_OFFSET = Math.PI / 2;
 
-// Cesty k souborům
+// Cesty k souborům — null znamená "tenhle nemám, kresli kruh / nepoužívej"
 const CHARACTER_FILES = {
   soldier: '/images/char_soldier.png',
   tank:    '/images/char_tank.png',
@@ -14,12 +14,14 @@ const CHARACTER_FILES = {
   ghost:   '/images/char_ghost.png',
 };
 
+// Zbraně — pokud máš jen některé z Kenney packu, ostatní nech null
+// (postava bude vidět ze spritu, weapon overlay se nepoužívá)
 const WEAPON_FILES = {
   pistol:  '/images/weapon_pistol.png',
   rifle:   '/images/weapon_rifle.png',
-  shotgun: '/images/weapon_shotgun.png',
+  shotgun: null,  // chybí v Kenney packu
   smg:     '/images/weapon_smg.png',
-  grenade: '/images/weapon_grenade.png',
+  grenade: null,  // chybí v Kenney packu
 };
 
 // Cache obrázků
@@ -51,8 +53,12 @@ function loadImage(src) {
 
 // Spustí načítání všech spritů hned při importu
 function preloadAll() {
-  for (const k in CHARACTER_FILES) loadImage(CHARACTER_FILES[k]);
-  for (const k in WEAPON_FILES)    loadImage(WEAPON_FILES[k]);
+  for (const k in CHARACTER_FILES) {
+    if (CHARACTER_FILES[k]) loadImage(CHARACTER_FILES[k]);
+  }
+  for (const k in WEAPON_FILES) {
+    if (WEAPON_FILES[k]) loadImage(WEAPON_FILES[k]);
+  }
 }
 preloadAll();
 
