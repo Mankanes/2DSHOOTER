@@ -1,10 +1,10 @@
 // SPRITES — načítá Kenney top-down shooter PNG sprity
 //
-// Kenney sprity jsou orientované "hlavou nahoru" v jejich obrázku.
-// Když chceme aby hlava směřovala ke kursoru (úhel 0 = doprava),
-// potřebujeme otočit -90° = -PI/2.
+// Kenney sprite: hlava postavy v _stand obrázku míří NAHORU.
+// V našem souřadném systému úhel 0 = doprava.
+// Aby hlava směřovala ke kursoru: rotujeme o +PI/2.
 
-const SPRITE_ROTATION_OFFSET = -Math.PI / 2;
+const SPRITE_ROTATION_OFFSET = Math.PI / 2;
 
 // Cesty k souborům — null znamená "tenhle nemám, kresli kruh / nepoužívej"
 const CHARACTER_FILES = {
