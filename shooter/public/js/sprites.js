@@ -1,8 +1,8 @@
 // SPRITES — načítá Kenney top-down shooter PNG sprity
 //
-// Kenney sprity jsou orientované "hlavou nahoru" (úhel = -PI/2 v jejich systému).
-// Náš souřadnicový systém má hráče "kouká doprava" (úhel = 0).
-// Proto otočíme sprity o -PI/2 = 90° doleva.
+// Kenney sprity jsou orientované "hlavou nahoru" v jejich obrázku.
+// Když chceme aby hlava směřovala ke kursoru (úhel 0 = doprava),
+// potřebujeme otočit -90° = -PI/2.
 
 const SPRITE_ROTATION_OFFSET = -Math.PI / 2;
 
@@ -36,13 +36,14 @@ function loadImage(src) {
   const img = new Image();
   img.onload = () => {
     loadedCount++;
+    console.log(`✓ Loaded sprite: ${src} (${img.naturalWidth}x${img.naturalHeight})`);
     if (loadedCount === totalCount) {
       loadCallbacks.forEach(cb => cb());
       loadCallbacks.length = 0;
     }
   };
   img.onerror = () => {
-    console.warn('Failed to load sprite:', src);
+    console.warn('✗ Failed to load sprite:', src);
     loadedCount++;
     img._failed = true;
   };
@@ -69,16 +70,18 @@ export function onSpritesLoaded(cb) {
 
 // Velikosti (Kenney sprity jsou ~80×80 px, my chceme ~50 px průměr na canvasu)
 const CHAR_DRAW_SIZE = 50;
-const WEAPON_DRAW_SIZE = 36;
-const WEAPON_OFFSET = 20; // jak daleko od středu hráče je zbraň
+const WEAPON_DRAW_SIZE = 32;
+// Pozice zbraně relativně ke středu postavy (po rotaci)
+// Kenney systém: nahoru = před postavou, vpravo = strana ruky
+const WEAPON_OFFSET_X = 12;  // doprava (do ruky)
+const WEAPON_OFFSET_Y = -8;  // mírně nahoru (před postavou)
 
 /**
- * Nakreslí postavu (s integrovanou zbraní v ruce).
- * Kenney sprity už mají postavu se zbraní, takže kreslíme jen ji.
+ * Nakreslí postavu a její aktuální zbraň zvlášť.
  *
  * @param {CanvasRenderingContext2D} ctx
  * @param {string} characterType - 'soldier' | 'tank' | 'medic' | 'ghost'
- * @param {string} weapon - aktuální zbraň (zatím ignorováno, Kenney sprite má svou)
+ * @param {string} weapon - aktuální zbraň ('pistol' | 'rifle' | 'shotgun' | 'smg' | 'grenade')
  * @param {number} x, y - pozice na canvasu (svět coords)
  * @param {number} angle - úhel rotace v radiánech (0 = doprava)
  * @param {object} opts - { alpha, scale }
@@ -86,40 +89,32 @@ const WEAPON_OFFSET = 20; // jak daleko od středu hráče je zbraň
 export function drawCharacter(ctx, characterType, weapon, x, y, angle, opts = {}) {
   const charSrc = CHARACTER_FILES[characterType] || CHARACTER_FILES.soldier;
   const charImg = images[charSrc];
+  const scale = opts.scale || 1;
 
   ctx.save();
   if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
   ctx.translate(x, y);
   ctx.rotate((angle || 0) + SPRITE_ROTATION_OFFSET);
 
+  // 1) Postava
   if (charImg && charImg.complete && !charImg._failed && charImg.naturalWidth > 0) {
-    const size = (opts.scale || 1) * CHAR_DRAW_SIZE;
-    // Kenney sprity mají zbraň vyčnívající nahoru; centrujeme bod zájmu
+    const size = scale * CHAR_DRAW_SIZE;
     ctx.drawImage(charImg, -size / 2, -size / 2, size, size);
   } else {
-    // Fallback - jednoduchý kruh dokud se sprite nenačte (nebo pokud chybí soubor)
     drawFallback(ctx, characterType);
   }
 
-  ctx.restore();
-}
-
-/**
- * Volitelně překreslí zbraň zvlášť. Kenney sprity ji už mají,
- * takže tohle je extra option (např. když hráč přepne zbraň).
- * Aktuálně to nepoužíváme — postava drží svou default zbraň ze spritu.
- */
-export function drawWeaponOverlay(ctx, weapon, x, y, angle, opts = {}) {
+  // 2) Zbraň navrch (offset doprava = strana ruky postavy v jejich orientaci hlavou nahoru)
   const weaponSrc = WEAPON_FILES[weapon];
-  const img = images[weaponSrc];
-  if (!img || !img.complete || img._failed) return;
+  if (weaponSrc) {
+    const wImg = images[weaponSrc];
+    if (wImg && wImg.complete && !wImg._failed && wImg.naturalWidth > 0) {
+      const wSize = scale * WEAPON_DRAW_SIZE;
+      // posun: vpravo od středu (ruka), mírně nahoru (před hráčem)
+      ctx.drawImage(wImg, WEAPON_OFFSET_X - wSize / 2, WEAPON_OFFSET_Y - wSize / 2, wSize, wSize);
+    }
+  }
 
-  ctx.save();
-  if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
-  ctx.translate(x, y);
-  ctx.rotate((angle || 0) + SPRITE_ROTATION_OFFSET);
-  const size = (opts.scale || 1) * WEAPON_DRAW_SIZE;
-  ctx.drawImage(img, -size / 2, -size / 2 - WEAPON_OFFSET, size, size);
   ctx.restore();
 }
 
