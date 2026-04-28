@@ -44,6 +44,30 @@ function saveKeybinds(kb) {
   localStorage.setItem('shooter_keybinds', JSON.stringify(kb));
 }
 
+// ── Crosshair settings ──────────────────────────
+const DEFAULT_CROSSHAIR = {
+  style: 'cross',     // cross | dot | circle | x
+  color: '#4ecdc4',
+  size: 8,            // délka ramen (cross/x) nebo radius (dot/circle)
+  thickness: 2,
+  gap: 4,             // mezera od středu
+  outline: false,
+  centerDot: false,
+};
+
+function loadCrosshair() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('shooter_crosshair') || '{}');
+    return { ...DEFAULT_CROSSHAIR, ...saved };
+  } catch {
+    return { ...DEFAULT_CROSSHAIR };
+  }
+}
+
+function saveCrosshair(c) {
+  localStorage.setItem('shooter_crosshair', JSON.stringify(c));
+}
+
 export function initGame({ session, showScreen }) {
   const socket = session.socket;
 
@@ -97,6 +121,7 @@ export function initGame({ session, showScreen }) {
   let scoreboardOpen = false;
 
   let keybinds = loadKeybinds();
+  let crosshair = loadCrosshair();
   let scoreboardData = []; // poslední data od serveru
   let currentPing = 0;
 
@@ -351,6 +376,7 @@ export function initGame({ session, showScreen }) {
     settingsOpen = true;
     settingsOverlay.classList.add('visible');
     renderKeybinds();
+    updateCrosshairUI();
   }
 
   function closeSettings() {
@@ -389,6 +415,82 @@ export function initGame({ session, showScreen }) {
       keybindsList.appendChild(li);
     }
   }
+
+  // ── Settings tabs ──────────────────────────────
+  const settingsTabs = document.querySelectorAll('.settings-tab');
+  const settingsPanes = document.querySelectorAll('.settings-pane');
+  settingsTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      settingsTabs.forEach(t => t.classList.toggle('active', t === tab));
+      settingsPanes.forEach(p => p.classList.toggle('active', p.dataset.pane === target));
+    });
+  });
+
+  // ── Crosshair editor ───────────────────────────
+  const chPreview = document.getElementById('chPreview');
+  const chPreviewCtx = chPreview.getContext('2d');
+  const chStyleBtns = document.getElementById('chStyleBtns');
+  const chColorBtns = document.getElementById('chColorBtns');
+  const chSize = document.getElementById('chSize');
+  const chSizeVal = document.getElementById('chSizeVal');
+  const chThick = document.getElementById('chThick');
+  const chThickVal = document.getElementById('chThickVal');
+  const chGap = document.getElementById('chGap');
+  const chGapVal = document.getElementById('chGapVal');
+  const chOutline = document.getElementById('chOutline');
+  const chDot = document.getElementById('chDot');
+  const resetCrosshairBtn = document.getElementById('resetCrosshairBtn');
+
+  function updateCrosshairUI() {
+    // active state na stylech
+    chStyleBtns.querySelectorAll('.ch-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.style === crosshair.style);
+    });
+    chColorBtns.querySelectorAll('.ch-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.color === crosshair.color);
+    });
+    chSize.value = crosshair.size;
+    chSizeVal.textContent = crosshair.size;
+    chThick.value = crosshair.thickness;
+    chThickVal.textContent = crosshair.thickness;
+    chGap.value = crosshair.gap;
+    chGapVal.textContent = crosshair.gap;
+    chOutline.classList.toggle('on', crosshair.outline);
+    chOutline.textContent = crosshair.outline ? 'ON' : 'OFF';
+    chDot.classList.toggle('on', crosshair.centerDot);
+    chDot.textContent = crosshair.centerDot ? 'ON' : 'OFF';
+    renderCrosshairPreview();
+  }
+
+  function renderCrosshairPreview() {
+    chPreviewCtx.fillStyle = '#2a2a2a';
+    chPreviewCtx.fillRect(0, 0, 120, 120);
+    drawCrosshair(chPreviewCtx, 60, 60, crosshair, 1.5); // mírně větší pro lepší viditelnost
+  }
+
+  function changeCrosshair(patch) {
+    crosshair = { ...crosshair, ...patch };
+    saveCrosshair(crosshair);
+    updateCrosshairUI();
+  }
+
+  chStyleBtns.querySelectorAll('.ch-btn').forEach(b => {
+    b.addEventListener('click', () => changeCrosshair({ style: b.dataset.style }));
+  });
+  chColorBtns.querySelectorAll('.ch-btn').forEach(b => {
+    b.addEventListener('click', () => changeCrosshair({ color: b.dataset.color }));
+  });
+  chSize.addEventListener('input',  () => changeCrosshair({ size: parseInt(chSize.value, 10) }));
+  chThick.addEventListener('input', () => changeCrosshair({ thickness: parseInt(chThick.value, 10) }));
+  chGap.addEventListener('input',   () => changeCrosshair({ gap: parseInt(chGap.value, 10) }));
+  chOutline.addEventListener('click', () => changeCrosshair({ outline: !crosshair.outline }));
+  chDot.addEventListener('click',     () => changeCrosshair({ centerDot: !crosshair.centerDot }));
+  resetCrosshairBtn.addEventListener('click', () => {
+    crosshair = { ...DEFAULT_CROSSHAIR };
+    saveCrosshair(crosshair);
+    updateCrosshairUI();
+  });
 
   // ── Network ──────────────────────────────────
   socket.on('player:left', (id) => {
@@ -648,6 +750,74 @@ export function initGame({ session, showScreen }) {
     ctx.fill();
   }
 
+  function drawCrosshair(targetCtx, cx, cy, c, scale = 1) {
+    const size = c.size * scale;
+    const thick = c.thickness * scale;
+    const gap = c.gap * scale;
+
+    function strokeAndOutline(drawFn) {
+      if (c.outline) {
+        targetCtx.lineWidth = thick + 2;
+        targetCtx.strokeStyle = '#000';
+        targetCtx.fillStyle = '#000';
+        drawFn();
+      }
+      targetCtx.lineWidth = thick;
+      targetCtx.strokeStyle = c.color;
+      targetCtx.fillStyle = c.color;
+      drawFn();
+    }
+
+    targetCtx.save();
+    targetCtx.lineCap = 'butt';
+
+    if (c.style === 'cross') {
+      strokeAndOutline(() => {
+        targetCtx.beginPath();
+        // 4 čárky od středu (s gap)
+        targetCtx.moveTo(cx - gap - size, cy); targetCtx.lineTo(cx - gap, cy);
+        targetCtx.moveTo(cx + gap, cy);        targetCtx.lineTo(cx + gap + size, cy);
+        targetCtx.moveTo(cx, cy - gap - size); targetCtx.lineTo(cx, cy - gap);
+        targetCtx.moveTo(cx, cy + gap);        targetCtx.lineTo(cx, cy + gap + size);
+        targetCtx.stroke();
+      });
+    } else if (c.style === 'x') {
+      strokeAndOutline(() => {
+        targetCtx.beginPath();
+        const d = (gap) / Math.SQRT2;
+        const e = (gap + size) / Math.SQRT2;
+        targetCtx.moveTo(cx - d, cy - d); targetCtx.lineTo(cx - e, cy - e);
+        targetCtx.moveTo(cx + d, cy - d); targetCtx.lineTo(cx + e, cy - e);
+        targetCtx.moveTo(cx - d, cy + d); targetCtx.lineTo(cx - e, cy + e);
+        targetCtx.moveTo(cx + d, cy + d); targetCtx.lineTo(cx + e, cy + e);
+        targetCtx.stroke();
+      });
+    } else if (c.style === 'circle') {
+      strokeAndOutline(() => {
+        targetCtx.beginPath();
+        targetCtx.arc(cx, cy, size, 0, Math.PI * 2);
+        targetCtx.stroke();
+      });
+    } else if (c.style === 'dot') {
+      // dot už je centerDot — tady jen větší
+      strokeAndOutline(() => {
+        targetCtx.beginPath();
+        targetCtx.arc(cx, cy, Math.max(1, thick), 0, Math.PI * 2);
+        targetCtx.fill();
+      });
+    }
+
+    if (c.centerDot && c.style !== 'dot') {
+      strokeAndOutline(() => {
+        targetCtx.beginPath();
+        targetCtx.arc(cx, cy, Math.max(1, thick / 2 + 0.5), 0, Math.PI * 2);
+        targetCtx.fill();
+      });
+    }
+
+    targetCtx.restore();
+  }
+
   // ── Game loop ────────────────────────────────
   let lastT = performance.now();
 
@@ -705,6 +875,9 @@ export function initGame({ session, showScreen }) {
       for (const b of bullets) drawBullet(b);
 
       ctx.restore();
+
+      // crosshair v screen coords (na pozici myši)
+      drawCrosshair(ctx, mouse.sx, mouse.sy, crosshair);
 
       drawMinimap();
 

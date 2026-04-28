@@ -199,7 +199,7 @@
       align-items: center;
       justify-content: center;
     }
-    canvas { background: #2a2a2a; display: block; }
+    canvas { background: #2a2a2a; display: block; cursor: none; }
     #hud {
       position: fixed; top: 8px; left: 8px;
       font-family: 'Silkscreen', monospace; font-size: 13px;
@@ -304,6 +304,107 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.6; }
     }
+
+    /* ─── Crosshair editor ─── */
+    .ch-section {
+      background: #111827;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .ch-row {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 10px;
+    }
+    .ch-row:last-child { margin-bottom: 0; }
+    .ch-label {
+      flex: 0 0 80px;
+      font-size: 12px;
+      color: #9ca3af;
+      text-transform: uppercase;
+    }
+    .ch-buttons {
+      display: flex; gap: 4px; flex: 1; flex-wrap: wrap;
+    }
+    .ch-btn {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #eee;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Silkscreen', monospace;
+      font-size: 11px;
+    }
+    .ch-btn:hover { border-color: #4b5563; }
+    .ch-btn.active {
+      background: #4ecdc4; color: #111;
+      border-color: #4ecdc4;
+    }
+    .ch-btn.color-swatch {
+      width: 28px; height: 28px;
+      padding: 0;
+    }
+    .ch-btn.color-swatch.active {
+      box-shadow: 0 0 0 2px #fff;
+    }
+    .ch-slider {
+      flex: 1;
+      accent-color: #4ecdc4;
+    }
+    .ch-value {
+      flex: 0 0 30px;
+      text-align: right;
+      font-family: 'Silkscreen', monospace;
+      color: #4ecdc4;
+      font-size: 12px;
+    }
+    .ch-toggle {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #6b7280;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Silkscreen', monospace;
+      font-size: 11px;
+    }
+    .ch-toggle.on {
+      background: #4ecdc4; color: #111; border-color: #4ecdc4;
+    }
+    /* Live preview */
+    .ch-preview {
+      width: 120px; height: 120px;
+      background: #2a2a2a;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      margin: 0 auto 12px;
+      display: block;
+    }
+    /* Tabs ve settings */
+    .settings-tabs {
+      display: flex; gap: 4px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 8px;
+    }
+    .settings-tab {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-family: 'Silkscreen', monospace;
+      font-size: 12px;
+      border-radius: 4px 4px 0 0;
+    }
+    .settings-tab.active {
+      color: #4ecdc4;
+      background: #1f2937;
+    }
+    .settings-tab:hover { color: #fff; }
+    .settings-pane { display: none; }
+    .settings-pane.active { display: block; }
 
     /* ─── Scoreboard (TAB) ─── */
     #scoreboard {
@@ -470,12 +571,82 @@
 
     <!-- Settings menu -->
     <div id="settingsOverlay" class="overlay">
-      <div class="panel">
-        <h1>⚙ Keybinds</h1>
-        <p style="color:#9ca3af; margin-bottom: 8px; font-size: 13px;">Click a key and press a new one.</p>
-        <ul class="keybinds-list" id="keybindsList"></ul>
-        <button id="resetKeybindsBtn" class="btn btn-secondary">Reset to defaults</button>
-        <button id="closeSettingsBtn" class="btn btn-primary">Back</button>
+      <div class="panel" style="width: 460px; max-width: 95vw;">
+        <h1>⚙ Settings</h1>
+
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-tab="keybinds">Keybinds</button>
+          <button class="settings-tab" data-tab="crosshair">Crosshair</button>
+        </div>
+
+        <!-- Keybinds tab -->
+        <div class="settings-pane active" data-pane="keybinds">
+          <p style="color:#9ca3af; margin-bottom: 8px; font-size: 13px;">Click a key and press a new one.</p>
+          <ul class="keybinds-list" id="keybindsList"></ul>
+          <button id="resetKeybindsBtn" class="btn btn-secondary">Reset to defaults</button>
+        </div>
+
+        <!-- Crosshair tab -->
+        <div class="settings-pane" data-pane="crosshair">
+          <canvas id="chPreview" class="ch-preview" width="120" height="120"></canvas>
+
+          <div class="ch-section">
+            <div class="ch-row">
+              <span class="ch-label">Style</span>
+              <div class="ch-buttons" id="chStyleBtns">
+                <button class="ch-btn" data-style="cross">Cross</button>
+                <button class="ch-btn" data-style="dot">Dot</button>
+                <button class="ch-btn" data-style="circle">Circle</button>
+                <button class="ch-btn" data-style="x">X</button>
+              </div>
+            </div>
+
+            <div class="ch-row">
+              <span class="ch-label">Color</span>
+              <div class="ch-buttons" id="chColorBtns">
+                <button class="ch-btn color-swatch" data-color="#4ecdc4" style="background:#4ecdc4"></button>
+                <button class="ch-btn color-swatch" data-color="#5ec85e" style="background:#5ec85e"></button>
+                <button class="ch-btn color-swatch" data-color="#ffe066" style="background:#ffe066"></button>
+                <button class="ch-btn color-swatch" data-color="#ff6b6b" style="background:#ff6b6b"></button>
+                <button class="ch-btn color-swatch" data-color="#ff66cc" style="background:#ff66cc"></button>
+                <button class="ch-btn color-swatch" data-color="#ffffff" style="background:#ffffff"></button>
+                <button class="ch-btn color-swatch" data-color="#000000" style="background:#000000"></button>
+              </div>
+            </div>
+
+            <div class="ch-row">
+              <span class="ch-label">Size</span>
+              <input type="range" class="ch-slider" id="chSize" min="2" max="20" value="8">
+              <span class="ch-value" id="chSizeVal">8</span>
+            </div>
+
+            <div class="ch-row">
+              <span class="ch-label">Thick</span>
+              <input type="range" class="ch-slider" id="chThick" min="1" max="5" value="2">
+              <span class="ch-value" id="chThickVal">2</span>
+            </div>
+
+            <div class="ch-row">
+              <span class="ch-label">Gap</span>
+              <input type="range" class="ch-slider" id="chGap" min="0" max="15" value="4">
+              <span class="ch-value" id="chGapVal">4</span>
+            </div>
+
+            <div class="ch-row">
+              <span class="ch-label">Outline</span>
+              <button class="ch-toggle" id="chOutline">OFF</button>
+            </div>
+
+            <div class="ch-row">
+              <span class="ch-label">Center dot</span>
+              <button class="ch-toggle" id="chDot">OFF</button>
+            </div>
+          </div>
+
+          <button id="resetCrosshairBtn" class="btn btn-secondary">Reset to defaults</button>
+        </div>
+
+        <button id="closeSettingsBtn" class="btn btn-primary" style="margin-top: 8px;">Back</button>
       </div>
     </div>
   </div>
