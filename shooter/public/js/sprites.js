@@ -6,6 +6,9 @@
 
 const SPRITE_ROTATION_OFFSET = Math.PI / 2;
 
+// DEBUG: nastav na true pokud ti rotace nesedí, uvidíš barevné značky
+const DEBUG_ROTATION = true;
+
 // Cesty k souborům — null znamená "tenhle nemám, kresli kruh / nepoužívej"
 const CHARACTER_FILES = {
   soldier: '/images/char_soldier.png',
@@ -102,6 +105,20 @@ export function drawCharacter(ctx, characterType, weapon, x, y, angle, opts = {}
     ctx.drawImage(charImg, -size / 2, -size / 2, size, size);
   } else {
     drawFallback(ctx, characterType);
+  }
+
+  // DEBUG overlay (pouze když DEBUG_ROTATION = true)
+  if (DEBUG_ROTATION) {
+    // RŮŽOVÝ obdélník na "vrcholu" lokálního Y (po rotaci tam směřuje "nahoru" v sprite)
+    ctx.fillStyle = 'magenta';
+    ctx.fillRect(-3, -45, 6, 6); // nahoře v sprite = kde má být hlava
+    // ZELENÁ šipka ve směru úhlu (kde je kursor v lokálním systému)
+    ctx.strokeStyle = 'lime';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(45, 0);
+    ctx.stroke();
   }
 
   // 2) Zbraň navrch (offset doprava = strana ruky postavy v jejich orientaci hlavou nahoru)
