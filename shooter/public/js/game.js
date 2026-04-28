@@ -574,8 +574,12 @@ export function initGame({ session, showScreen }) {
     const inv = p.invisibleUntil && Date.now() < p.invisibleUntil;
     const sh  = p.shieldUntil    && Date.now() < p.shieldUntil;
 
+    // Pro ostatní je neviditelný hráč úplně skrytý — žádný kruh, jméno, HP bar
+    if (inv && !isSelf) return;
+
     ctx.save();
-    ctx.globalAlpha = inv ? (isSelf ? 0.35 : 0.1) : 1;
+    // Sám sebe vidím poloprůhledně, ostatní mě vidí normálně (nebo vůbec)
+    ctx.globalAlpha = inv ? 0.35 : 1;
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle || 0);
     ctx.fillStyle = isSelf ? '#4ecdc4' : (p.color || '#ff6b6b');
@@ -599,17 +603,23 @@ export function initGame({ session, showScreen }) {
     }
 
     if (p.name) {
+      ctx.save();
+      ctx.globalAlpha = inv ? 0.35 : 1;
       ctx.fillStyle = '#fff';
       ctx.font = '12px "Silkscreen", monospace';
       ctx.textAlign = 'center';
       ctx.fillText(p.name, p.x, p.y - 36);
+      ctx.restore();
     }
 
     const pct = Math.max(0, (p.hp || 0) / (p.maxHp || 100));
+    ctx.save();
+    ctx.globalAlpha = inv ? 0.35 : 1;
     ctx.fillStyle = '#000';
     ctx.fillRect(p.x - 22, p.y - 30, 44, 6);
     ctx.fillStyle = '#5ec85e';
     ctx.fillRect(p.x - 22, p.y - 30, 44 * pct, 6);
+    ctx.restore();
   }
 
   function drawBullet(b) {
@@ -681,10 +691,14 @@ export function initGame({ session, showScreen }) {
 
       const ab = me.character.ability;
       const cd = me.abilityCooldown > 0 ? me.abilityCooldown.toFixed(1) + 's' : 'ready';
+      const invMs = me.invisibleUntil ? me.invisibleUntil - Date.now() : 0;
+      const invTxt = invMs > 0 ? ` | INVISIBLE ${(invMs / 1000).toFixed(1)}s` : '';
+      const shMs = me.shieldUntil ? me.shieldUntil - Date.now() : 0;
+      const shTxt = shMs > 0 ? ` | SHIELD ${(shMs / 1000).toFixed(1)}s` : '';
       hud.textContent =
         `HP ${Math.round(me.hp)}/${me.maxHp} | ` +
         `Slot: ${activeSlot} (${loadout?.[activeSlot] || '?'}) | ` +
-        `${ab.id}: ${cd} | ${currentPing}ms | TAB scoreboard`;
+        `${ab.id}: ${cd} | ${currentPing}ms${invTxt}${shTxt} | TAB scoreboard`;
     }
 
     requestAnimationFrame(loop);
